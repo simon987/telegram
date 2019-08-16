@@ -47,6 +47,14 @@ footer a {
     text-align: center;
 }
 
+.search-button {
+    background-color: #0088cc;
+}
+
+.search-button:focus, .search-button:hover {
+    background-color: #00588b;
+}
+
 /* Telegram message style */
 .pull_left {
     float: left;

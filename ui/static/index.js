@@ -41,9 +41,6 @@ function clearResults(output) {
 
 function displayResults(hits, output) {
     for (let i = 0; i < hits.length; i++) {
-        if (!hits[i]["_source"]["post_author"]) {
-            hits[i]["_source"]["post_author"] = "???";
-        }
         output.appendChild(createTelegramMessage(hits[i]));
     }
 }
@@ -166,7 +163,13 @@ function createTelegramMessageBody(hit) {
 
     const fromName = document.createElement("div");
     fromName.setAttribute("class", "from_name");
-    fromName.appendChild(document.createTextNode(hit["_source"]["post_author"]));
+
+    if (hit["_source"]["post_author"]) {
+        fromName.appendChild(document.createTextNode(
+            hit["_source"]["channel_name"] + " : " + hit["_source"]["post_author"]));
+    } else {
+        fromName.appendChild(document.createTextNode(hit["_source"]["channel_name"]));
+    }
 
     const text = document.createElement("div");
     text.setAttribute("class", "text");
@@ -192,8 +195,14 @@ function createTelegramUserPic(hit) {
     const initials = document.createElement("div");
     initials.setAttribute("class", "initials");
     initials.setAttribute("style", "line-height: 42px");
-    initials.setAttribute("title", hit["_source"]["post_author"]);
-    initials.appendChild(document.createTextNode(hit["_source"]["post_author"][0].toUpperCase()));
+
+    if (hit["_source"]["post_author"]) {
+        initials.setAttribute("title", hit["_source"]["post_author"]);
+        initials.appendChild(document.createTextNode(hit["_source"]["post_author"][0].toUpperCase()));
+    } else {
+        initials.setAttribute("title", hit["_source"]["channel_name"]);
+        initials.appendChild(document.createTextNode(hit["_source"]["channel_name"][0].toUpperCase()));
+    }
 
     userPicWrap.appendChild(userPic);
     userPic.appendChild(initials);
