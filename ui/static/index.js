@@ -51,9 +51,11 @@ function onSubmit() {
         query: {
             bool: {
                 must: [
-                    {"range": {"date": {"gte": dateRange[0], "lte": dateRange[1]}}},
+                ],
+                filter: [
+                    {range: {date: {gte: dateRange[0], lte: dateRange[1]}}}
                 ]
-            },
+            }
         },
         size: 25,
         from: 0
@@ -61,16 +63,24 @@ function onSubmit() {
 
     const message = document.getElementById("search").value;
     if (message) {
-        query.query.bool.must.push({"match": {"message": message}})
+        query.query.bool.must.push(
+            {
+                simple_query_string: {
+                    query: message,
+                    fields: ["message"],
+                    default_operator: "and"
+                }
+            }
+        );
     }
     const author = document.getElementById("author").value;
     if (author) {
-        query.query.bool.must.push({"match": {"post_author": author}})
+        query.query.bool.filter.push({"match": {"post_author": author}})
     }
 
     const channel = document.getElementById("channel").value;
     if (channel) {
-        query.query.bool.must.push({"match": {"channel_name": channel}})
+        query.query.bool.filter.push({"match": {"channel_name": channel}})
     }
 
     const output = document.getElementById("output");
@@ -78,6 +88,7 @@ function onSubmit() {
     clearResults(output);
     output.appendChild(createPreloader());
 
+    console.log(query);
     queryES(query, function (elasticResponse) {
         const hits = elasticResponse["hits"]["hits"];
 
@@ -98,7 +109,7 @@ function onSubmit() {
                 output.appendChild(preloader);
 
                 query.from += query.size;
-                queryES(query, function(elasticResponse) {
+                queryES(query, function (elasticResponse) {
                     displayResults(elasticResponse["hits"]["hits"], output);
                     preloader.remove();
                     output.appendChild(btn);
