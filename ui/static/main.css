@@ -38,6 +38,15 @@ footer a {
     color: #1E88E5;
 }
 
+#date-slider {
+    margin-right: 10px;
+    margin-left: 10px;
+}
+
+#output .btn-wrapper {
+    text-align: center;
+}
+
 /* Telegram message style */
 .pull_left {
     float: left;

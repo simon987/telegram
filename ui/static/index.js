@@ -13,7 +13,7 @@ window.onload = function () {
             max: new Date().getTime()
         },
 
-        step: 7 * 24 * 60 * 60 * 1000,
+        step: 24 * 60 * 60 * 1000,
 
         start: [new Date("2016").getTime(), new Date().getTime()],
 
@@ -39,6 +39,15 @@ function clearResults(output) {
     }
 }
 
+function displayResults(hits, output) {
+    for (let i = 0; i < hits.length; i++) {
+        if (!hits[i]["_source"]["post_author"]) {
+            hits[i]["_source"]["post_author"] = "???";
+        }
+        output.appendChild(createTelegramMessage(hits[i]));
+    }
+}
+
 function onSubmit() {
 
     let query = {
@@ -49,7 +58,9 @@ function onSubmit() {
                     {"range": {"date": {"gte": dateRange[0], "lte": dateRange[1]}}},
                 ]
             },
-        }
+        },
+        size: 25,
+        from: 0
     };
     const author = document.getElementById("author").value;
     if (author) {
@@ -71,13 +82,27 @@ function onSubmit() {
 
         clearResults(output);
 
-        output.appendChild(createHeader(`${hits.length} messages`));
+        output.appendChild(createHeader(`${elasticResponse["hits"]["total"]["value"]} messages`));
+        displayResults(elasticResponse["hits"]["hits"], output);
 
-        for (let i = 0; i < hits.length; i++) {
-            if (!hits[i]["_source"]["post_author"]) {
-                hits[i]["_source"]["post_author"] = "???";
-            }
-            output.appendChild(createTelegramMessage(hits[i]));
+        // 'Load more' Button
+        if (hits.length < elasticResponse["hits"]["total"]["value"]) {
+            output.appendChild(createButton("Load more results", function () {
+
+                // Move button to end
+                const btn = output.lastChild;
+                btn.remove();
+
+                const preloader = createPreloader();
+                output.appendChild(preloader);
+
+                query.from += query.size;
+                queryES(query, function(elasticResponse) {
+                    displayResults(elasticResponse["hits"]["hits"], output);
+                    preloader.remove();
+                    output.appendChild(btn);
+                });
+            }))
         }
     });
 
@@ -133,8 +158,7 @@ function createTelegramMessageBody(hit) {
     const date = new Date(hit["_source"]["date"] * 1000);
     dateDetails.setAttribute("title", date.toISOString());
 
-    // TODO: Human readable date
-    dateDetails.appendChild(document.createTextNode(date.toISOString()));
+    dateDetails.appendChild(document.createTextNode(moment(date).fromNow()));
 
     const fromName = document.createElement("div");
     fromName.setAttribute("class", "from_name");
@@ -180,4 +204,18 @@ function createPreloader() {
     indeterminate.setAttribute('class', 'indeterminate');
     el.appendChild(indeterminate);
     return el;
+}
+
+function createButton(text, cb) {
+    const btnWrapper = document.createElement("div");
+    btnWrapper.setAttribute("class", "btn-wrapper");
+
+    const button = document.createElement("a");
+    button.setAttribute("class", "waves-effect waves-light btn");
+    button.appendChild(document.createTextNode(text));
+    button.onclick = cb;
+
+    btnWrapper.appendChild(button);
+
+    return btnWrapper;
 }
