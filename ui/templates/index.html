@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title></title>
+    <meta name="description"
+          content="TODO: description">
+    <meta content="text/html;charset=utf-8" http-equiv="Content-Type">
+    <link rel="stylesheet" href="../static/materialize.css">
+
+    <link rel="stylesheet" type="text/css" href="../static/main.css"/>
+    <link rel="stylesheet" type="text/css" href="../static/nouislider.min.css"/>
+
+    <meta name="viewport" content="width=device-width,initial-scale=1.0">
+    <meta name=referrer content=no-referrer>
+</head>
+<body>
+
+<main class="container">
+    {# Header#}
+    <a class="header" href="/">
+        <h2>Pushshift Telegram Ingest</h2>
+    </a>
+
+    {# Search bar #}
+    <div class="card-panel">
+        <div class="card-content">
+            <form onsubmit="return onSubmit()">
+                <input type="submit" style="position: absolute; left: -9999px"/>
+                <div class="row">
+                    <div class="input-field col l12">
+                        <input id="search" type="search" required>
+                        <label for="search">Search</label>
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="input-field col m6">
+                        <input id="channel" type="text" placeholder="Channel">
+                    </div>
+                    <div class="input-field col m6">
+                        <input id="author" type="text" placeholder="Author">
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="date-values">
+                        <span class="date-val" id="event-start"></span>
+                        <span class="date-sep">&nbsp;-&nbsp;</span>
+                        <span class="date-val" id="event-end"></span>
+                    </div>
+                    <div id="date-slider"></div>
+                </div>
+
+            </form>
+        </div>
+    </div>
+
+    {# Search results #}
+    <div id="output"></div>
+
+    {# About #}
+    <div class="card">
+        <div class="card-content">
+            <div class="card-title">About</div>
+            <p>The Pushshift Telegram Ingest API ingests data from numerous Telegram
+                channels / groups and stores that data in Postgres and Elasticsearch and
+                provides an easy to use API that can be used to search for data across
+                numerous channels.</p>
+        </div>
+    </div>
+</main>
+
+{# Footer #}
+<footer class="page-footer">
+    <div class="container">
+        <div class="row">Fork on <a href="https://github.com/pushshift/telegram">Github</a></div>
+    </div>
+    <div class="footer-copyright">
+        <div class="container">TODO Copyright</div>
+    </div>
+</footer>
+
+</body>
+
+<script src="../static/materialize.min.js"></script>
+<script src="../static/index.js"></script>
+<script src="../static/nouislider.min.js"></script>
+<script src="../static/wNumb.js"></script>
+
+</html>

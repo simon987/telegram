@@ -1,0 +1,95 @@
+/* Page style */
+body {
+    background-color: #f1f4f6;
+
+    display: flex;
+    min-height: 100vh;
+    flex-direction: column;
+}
+
+main {
+    flex: 1 0 auto;
+}
+
+.page-footer {
+    background-color: #1E88E5;
+    color: #CFD8DC;
+}
+
+footer a {
+    color: #CFD8DC;
+}
+
+.row {
+    margin-bottom: 0;
+}
+
+.date-values {
+    margin-top: 10px;
+    margin-bottom: 10px;
+    text-align: center;
+}
+
+.date-val {
+
+}
+
+.date-sep {
+    color: #1E88E5;
+}
+
+/* Telegram message style */
+.pull_left {
+    float: left;
+}
+
+.pull_right {
+    float: right;
+}
+
+.userpic {
+    display: block;
+    border-radius: 50%;
+    overflow: hidden;
+}
+
+.userpic .initials {
+    display: block;
+    color: #fff;
+    font-size: 16px;
+    text-align: center;
+    text-transform: uppercase;
+    user-select: none;
+
+    /* Note: I don't know what algorithm telegram uses for userpic colors! */
+    background-color: #ff5555;
+}
+
+.message {
+    margin: 0 -10px;
+    padding: 10px;
+    transition: background-color 2.0s ease;
+}
+
+.message .body {
+    margin-left: 60px;
+}
+
+#output {
+    font: 12px/18px 'Open Sans', "Lucida Grande", "Lucida Sans Unicode", Arial, Helvetica, Verdana, sans-serif;
+    padding: 16px 0;
+}
+
+.from_name {
+    color: #3892db;
+    font-weight: 700;
+    padding-bottom: 5px;
+}
+
+.clearfix::after {
+    content: " ";
+    visibility: hidden;
+    display: block;
+    height: 0;
+    clear: both;
+}
