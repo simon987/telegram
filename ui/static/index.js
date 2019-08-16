@@ -54,7 +54,6 @@ function onSubmit() {
         query: {
             bool: {
                 must: [
-                    {"match": {"message": document.getElementById("search").value}},
                     {"range": {"date": {"gte": dateRange[0], "lte": dateRange[1]}}},
                 ]
             },
@@ -62,6 +61,11 @@ function onSubmit() {
         size: 25,
         from: 0
     };
+
+    const message = document.getElementById("search").value;
+    if (message) {
+        query.query.bool.must.push({"match": {"message": message}})
+    }
     const author = document.getElementById("author").value;
     if (author) {
         query.query.bool.must.push({"match": {"post_author": author}})
@@ -112,7 +116,7 @@ function onSubmit() {
 
 function queryES(query, cb) {
 
-    const base_url = "http://dev.pushshift.io/telegram/_search";
+    const base_url = "https://dev.pushshift.io/telegram/_search";
     const url = base_url + `?source_content_type=application/json&source=${JSON.stringify(query)}`;
 
     const xmlHttp = new XMLHttpRequest();
