@@ -45,6 +45,15 @@ function displayResults(hits, output) {
     }
 }
 
+function decorateMessage(message, query) {
+
+    query.split(" ").forEach(token => {
+        message = message.replace(new RegExp(`(${token})`, "ig"), "<mark>$1</mark>")
+    });
+
+    return message;
+}
+
 function onSubmit() {
 
     let query = {
@@ -184,7 +193,9 @@ function createTelegramMessageBody(hit) {
 
     const text = document.createElement("div");
     text.setAttribute("class", "text");
-    text.appendChild(document.createTextNode(hit["_source"]["message"]));
+    const query = document.getElementById("search").value;
+    const msg = decorateMessage(hit["_source"]["message"], query);
+    text.insertAdjacentHTML("afterbegin", msg);
 
     //TODO: Media files?
 
