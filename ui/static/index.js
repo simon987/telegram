@@ -47,9 +47,24 @@ function displayResults(hits, output) {
 
 function decorateMessage(message, query) {
 
-    query.split(" ").forEach(token => {
-        message = message.replace(new RegExp(`(${token})`, "ig"), "<mark>$1</mark>")
-    });
+    if (!message) {
+        return null;
+    }
+
+    if (query) {
+        query.split(" ").forEach(token => {
+            message = message.replace(new RegExp(`(${token})`, "ig"), "<mark>$1</mark>"
+            )
+        });
+    }
+
+    // Make links clickable, but remove the 'mark' tags in the href
+    message = message.replace(
+        new RegExp('(https?://[\\w_-]+.[a-z]{2,4}([^\\s"]*|$))', "ig"),
+        function (match, g1) {
+            return `<a href=\"${g1.replace(/<\/?mark>/g, "")}\">${g1}</a>`
+        }
+    );
 
     return message;
 }
@@ -59,8 +74,7 @@ function onSubmit() {
     let query = {
         query: {
             bool: {
-                must: [
-                ],
+                must: [],
                 filter: [
                     {range: {date: {gte: dateRange[0], lte: dateRange[1]}}}
                 ]
