@@ -183,7 +183,7 @@ function createHeader(text) {
 function createTelegramMessage(hit) {
 
     const message = document.createElement("div");
-    message.setAttribute("class", "message clearfix");
+    message.setAttribute("class", "message clearfix card");
 
     message.appendChild(createTelegramUserPic(hit));
     message.appendChild(createTelegramMessageBody(hit));

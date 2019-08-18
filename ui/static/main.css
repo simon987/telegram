@@ -84,7 +84,7 @@ footer a {
 }
 
 .message {
-    margin: 0 -10px;
+    margin: 5px -10px;
     padding: 10px;
     transition: background-color 2.0s ease;
 }
@@ -96,6 +96,10 @@ footer a {
 #output {
     font: 12px/18px 'Open Sans', "Lucida Grande", "Lucida Sans Unicode", Arial, Helvetica, Verdana, sans-serif;
     padding: 16px 0;
+}
+
+#output a {
+    margin-top: 1rem;
 }
 
 .from-name {
