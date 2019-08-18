@@ -28,11 +28,11 @@
             <form onsubmit="return onSubmit()">
                 <input type="submit" style="position: absolute; left: -9999px"/>
                 <div class="row">
-                    <div class="input-field col l10">
+                    <div class="input-field col s8">
                         <input id="search" type="search">
                         <label for="search">Search</label>
                     </div>
-                    <button class="waves-effect waves-light btn-large search-button col l2">Search</button>
+                    <button class="waves-effect waves-light btn-large search-button col s4">Search</button>
                 </div>
                 <div class="row">
                     <div class="input-field col m6">
@@ -46,19 +46,25 @@
                 </div>
 
                 <div class="row">
-                    <div class="input-field col s3">
+                    <div class="input-field col l3">
                         <select id="sort">
-                            <option value="channel_name">Channel</option>
                             <option value="date">Date</option>
+                            <option value="channel_name">Channel</option>
                         </select>
                         <label>Sort by</label>
                     </div>
-                    <div class="switch col s3">
+                    <div class="switch col l3">
                         <label>
                             Desc
                             <input type="checkbox" id="sort-order">
                             <span class="lever"></span>
                             Asc
+                        </label>
+                    </div>
+                    <div class="col l6" style="line-height: 5rem;">
+                        <label>
+                            <input type="checkbox" class="filled-in" checked="checked" id="load"/>
+                            <span>Load media</span>
                         </label>
                     </div>
                 </div>

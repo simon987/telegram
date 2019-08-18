@@ -49,6 +49,7 @@ footer a {
 
 .search-button {
     background-color: #0088cc;
+    padding-left: 0.5rem !important;
 }
 
 .search-button:focus, .search-button:hover {
