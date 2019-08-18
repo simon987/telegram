@@ -31,6 +31,7 @@ window.onload = function () {
         dateRange[handle] = Math.round(new Date(+values[handle]).getTime() / 1000);
     });
 
+    const instances = M.FormSelect.init(document.querySelectorAll('select'), {});
 };
 
 function clearResults(output) {
@@ -71,6 +72,9 @@ function decorateMessage(message, query) {
 
 function onSubmit() {
 
+    const sort = document.getElementById("sort").value;
+    const sortOrder = document.getElementById("sort-order").checked ? "asc" : "desc";
+
     let query = {
         query: {
             bool: {
@@ -80,6 +84,9 @@ function onSubmit() {
                 ]
             }
         },
+        "sort" : [
+            {[sort]: sortOrder}
+        ],
         size: 25,
         from: 0
     };

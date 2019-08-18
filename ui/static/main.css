@@ -109,6 +109,10 @@ footer a {
     cursor: pointer;
 }
 
+.switch {
+    line-height: 5rem;
+}
+
 .clearfix::after {
     content: " ";
     visibility: hidden;
