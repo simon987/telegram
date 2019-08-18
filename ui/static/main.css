@@ -97,10 +97,16 @@ footer a {
     padding: 16px 0;
 }
 
-.from_name {
+.from-name {
     color: #3892db;
     font-weight: 700;
     padding-bottom: 5px;
+    cursor: pointer;
+}
+
+.author-name {
+    font-weight: 400;
+    cursor: pointer;
 }
 
 .clearfix::after {

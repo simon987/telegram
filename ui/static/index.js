@@ -196,11 +196,31 @@ function createTelegramMessageBody(hit) {
     dateDetails.appendChild(document.createTextNode(moment(date).fromNow()));
 
     const fromName = document.createElement("div");
-    fromName.setAttribute("class", "from_name");
+    fromName.setAttribute("class", "from-name");
+    fromName.setAttribute("title", "Search for this channel");
+    fromName.onclick = function () {
+        document.getElementById("channel").value = hit["_source"]["channel_name"];
+        document.getElementById("channel-label").classList.add("active");
+        onSubmit();
+    };
 
     if (hit["_source"]["post_author"]) {
         fromName.appendChild(document.createTextNode(
-            hit["_source"]["channel_name"] + " : " + hit["_source"]["post_author"]));
+            hit["_source"]["channel_name"] + ": "));
+
+        const authorName = document.createElement("span");
+        authorName.setAttribute("class", "author-name");
+        authorName.setAttribute("title", "Search for this author");
+        authorName.appendChild(document.createTextNode(hit["_source"]["post_author"]));
+
+        authorName.onclick = function (e) {
+            e.stopPropagation();
+            document.getElementById("author").value = hit["_source"]["post_author"];
+            document.getElementById("author-label").classList.add("active");
+            onSubmit();
+            return false;
+        };
+        fromName.appendChild(authorName);
     } else {
         fromName.appendChild(document.createTextNode(hit["_source"]["channel_name"]));
     }
