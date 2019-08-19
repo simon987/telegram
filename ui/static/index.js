@@ -1,11 +1,14 @@
 let dateRange = [-1, -1];
-
+let contextMessage;
+let output;
 
 function formatDate(date) {
     return date.toISOString().slice(0, 10)
 }
 
 window.onload = function () {
+    output = document.getElementById("output");
+
     let slider = document.getElementById("date-slider");
     noUiSlider.create(slider, {
         range: {
@@ -34,15 +37,21 @@ window.onload = function () {
     const instances = M.FormSelect.init(document.querySelectorAll('select'), {});
 };
 
-function clearResults(output) {
+function clearResults() {
     while (output.hasChildNodes()) {
         output.removeChild(output.lastChild);
     }
 }
 
-function displayResults(hits, output) {
+function appendResults(hits) {
     for (let i = 0; i < hits.length; i++) {
         output.appendChild(createTelegramMessage(hits[i]));
+    }
+}
+
+function prependResults(hits) {
+    for (let i = 0; i < hits.length; i++) {
+        output.prepend(createTelegramMessage(hits[i]));
     }
 }
 
@@ -70,6 +79,55 @@ function decorateMessage(message, query) {
     return message;
 }
 
+function addLoadMoreButton(output, query, direction) {
+    if (direction === "down") {
+        output.appendChild(createButton("Load more results", "waves-effect waves-light btn",
+            function () {
+
+                // Move button to end
+                const btn = output.lastChild;
+                btn.remove();
+
+                const preloader = createPreloader();
+                output.appendChild(preloader);
+
+                query.from += query.size;
+                if (Object.keys(query.query.bool.filter[0].range)[0] === "date") {
+                    query.query.bool.filter[0].range.date.lte += 900000;
+                }
+                queryES(query, function (elasticResponse) {
+                    appendResults(elasticResponse["hits"]["hits"], output);
+                    preloader.remove();
+                    if (elasticResponse["hits"]["hits"]) {
+                        output.appendChild(btn);
+                    }
+                });
+            }));
+    } else {
+        output.prepend(createButton("Load more results", "waves-effect waves-light btn",
+            function () {
+
+                const btn = output.firstChild;
+                btn.remove();
+
+                const preloader = createPreloader();
+                output.prepend(preloader);
+
+                query.from += query.size;
+                if (Object.keys(query.query.bool.filter[0].range)[0] === "date") {
+                    query.query.bool.filter[0].range.date.gte -= 900000;
+                }
+                queryES(query, function (elasticResponse) {
+                    prependResults(elasticResponse["hits"]["hits"], output);
+                    preloader.remove();
+                    if (elasticResponse["hits"]["hits"]) {
+                        output.prepend(btn);
+                    }
+                });
+            }));
+    }
+}
+
 function onSubmit() {
 
     const sort = document.getElementById("sort").value;
@@ -84,8 +142,9 @@ function onSubmit() {
                 ]
             }
         },
-        "sort" : [
-            {[sort]: sortOrder}
+        "sort": [
+            {[sort]: sortOrder},
+            {"_id": "asc"},
         ],
         size: 25,
         from: 0
@@ -115,36 +174,18 @@ function onSubmit() {
 
     const output = document.getElementById("output");
 
-    clearResults(output);
-    output.appendChild(createPreloader());
+    clearResults();
+    let preloader = createPreloader();
+    output.appendChild(preloader);
 
-    console.log(query);
     queryES(query, function (elasticResponse) {
-        const hits = elasticResponse["hits"]["hits"];
-
-        clearResults(output);
+        preloader.remove();
 
         output.appendChild(createHeader(`${elasticResponse["hits"]["total"]["value"]} messages`));
-        displayResults(elasticResponse["hits"]["hits"], output);
+        appendResults(elasticResponse["hits"]["hits"], output);
 
-        // 'Load more' Button
-        if (hits.length < elasticResponse["hits"]["total"]["value"]) {
-            output.appendChild(createButton("Load more results", function () {
-
-                // Move button to end
-                const btn = output.lastChild;
-                btn.remove();
-
-                const preloader = createPreloader();
-                output.appendChild(preloader);
-
-                query.from += query.size;
-                queryES(query, function (elasticResponse) {
-                    displayResults(elasticResponse["hits"]["hits"], output);
-                    preloader.remove();
-                    output.appendChild(btn);
-                });
-            }))
+        if (elasticResponse["hits"]["hits"].length < elasticResponse["hits"]["total"]["value"]) {
+            addLoadMoreButton(output, query, "down")
         }
     });
 
@@ -184,9 +225,52 @@ function createTelegramMessage(hit) {
 
     const message = document.createElement("div");
     message.setAttribute("class", "message clearfix card");
+    if (contextMessage === hit["_id"]) {
+        message.classList.add("context-message");
+        window.setTimeout(function() {
+            message.scrollIntoView()
+        }, 1000);
+    }
 
     message.appendChild(createTelegramUserPic(hit));
     message.appendChild(createTelegramMessageBody(hit));
+
+    message.appendChild(createButton("context", "btn btn-xsmall pull_right action-btn",
+        function () {
+            contextMessage = hit["_id"];
+            clearResults(output);
+            let preloader = createPreloader();
+            output.appendChild(preloader);
+
+            const query = {
+                query: {
+                    bool: {
+                        must: [],
+                        filter: [
+                            {range: {date: {gte: hit["_source"]["date"] - 60, lte: hit["_source"]["date"] + 60}}},
+                            {"match": {"channel_name": hit["_source"]["channel_name"]}}
+                        ]
+                    }
+                },
+                "sort": [
+                    {"date": "asc"}
+                ],
+                size: 20,
+                from: 0
+            };
+
+            queryES(query, function (elasticResponse) {
+
+                appendResults(elasticResponse["hits"]["hits"]);
+                preloader.remove();
+
+                let upQuery = JSON.parse(JSON.stringify(query));
+                upQuery.sort[0].date = "desc";
+
+                addLoadMoreButton(document.getElementById("output"), query, "down");
+                addLoadMoreButton(document.getElementById("output"), upQuery, "up");
+            })
+        }));
 
     return message;
 }
@@ -282,12 +366,12 @@ function createPreloader() {
     return el;
 }
 
-function createButton(text, cb) {
+function createButton(text, classList, cb) {
     const btnWrapper = document.createElement("div");
     btnWrapper.setAttribute("class", "btn-wrapper");
 
     const button = document.createElement("a");
-    button.setAttribute("class", "waves-effect waves-light btn");
+    button.setAttribute("class", classList);
     button.appendChild(document.createTextNode(text));
     button.onclick = cb;
 

@@ -93,13 +93,28 @@ footer a {
     margin-left: 60px;
 }
 
+.context-message {
+    background-color: rgba(255, 69, 0, 0.4);
+}
+
 #output {
     font: 12px/18px 'Open Sans', "Lucida Grande", "Lucida Sans Unicode", Arial, Helvetica, Verdana, sans-serif;
     padding: 16px 0;
 }
 
-#output a {
+.action-btn {
+    background-color: rgba(0, 136, 204, 0.75);
+    margin-top: 0.5rem;
+}
+
+#output > .btn-wrapper > a {
     margin-top: 1rem;
+}
+
+.btn-xsmall {
+    height: 22.4px;
+    line-height: 22.4px;
+    font-size: 13px;
 }
 
 .from-name {
