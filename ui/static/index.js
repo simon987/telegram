@@ -98,7 +98,7 @@ function addLoadMoreButton(output, query, direction) {
                 queryES(query, function (elasticResponse) {
                     appendResults(elasticResponse["hits"]["hits"], output);
                     preloader.remove();
-                    if (elasticResponse["hits"]["hits"]) {
+                    if (elasticResponse["hits"]["hits"].length > 0) {
                         output.appendChild(btn);
                     }
                 });
@@ -120,7 +120,7 @@ function addLoadMoreButton(output, query, direction) {
                 queryES(query, function (elasticResponse) {
                     prependResults(elasticResponse["hits"]["hits"], output);
                     preloader.remove();
-                    if (elasticResponse["hits"]["hits"]) {
+                    if (elasticResponse["hits"]["hits"].length > 0) {
                         output.prepend(btn);
                     }
                 });
