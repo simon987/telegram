@@ -62,7 +62,7 @@ function decorateMessage(message, query) {
     }
 
     if (query) {
-        query.split(" ").forEach(token => {
+        query.split(" ").filter(token => token.length > 2).forEach(token => {
             message = message.replace(new RegExp(`(${token})`, "ig"), "<mark>$1</mark>"
             )
         });
