@@ -1,5 +1,9 @@
+// TODO: make something with the header
+// TODO: media files
+
 //Constants
 const QUERY_SIZE = 20;
+const AUTOCOMPLETE_DEBOUNCE = 500;
 
 let state = {
     dateRange: [0, 0],
@@ -12,6 +16,26 @@ let state = {
 };
 
 let OUTPUT_DIV;
+
+function autocompleteFunc(CHANNEL_ELEM, channel_auto, field) {
+    return function () {
+        const text = CHANNEL_ELEM.value;
+
+        if (text.length >= 2) {
+            fetchAutoComplete(text, field, function (hits) {
+                let data = {};
+                hits.forEach(hit => {
+                    data[hit] = null;
+                });
+                channel_auto.updateData(data);
+                window.setTimeout(() => channel_auto.open(), 100);
+            })
+        } else {
+            channel_auto.updateData({});
+            channel_auto.close();
+        }
+    };
+}
 
 window.onload = function () {
     OUTPUT_DIV = document.getElementById("output");
@@ -42,12 +66,45 @@ window.onload = function () {
         state.dateRange[handle] = Math.round(new Date(+values[handle]).getTime() / 1000);
     });
 
-    // Materialize: init 'select' elements
-    M.FormSelect.init(document.querySelectorAll('select'), {});
+    // Materialize: init elements
+    M.FormSelect.init(document.querySelectorAll("select"), {});
+
+    const CHANNEL_ELEM = document.getElementById("channel");
+    M.Autocomplete.init(CHANNEL_ELEM, {});
+    const channel_auto = M.Autocomplete.getInstance(CHANNEL_ELEM);
+    CHANNEL_ELEM.addEventListener(
+        "keypress",
+        debounce(autocompleteFunc(CHANNEL_ELEM, channel_auto, "channel_name"), AUTOCOMPLETE_DEBOUNCE)
+    );
+
+    const AUTHOR_ELEM = document.getElementById("author");
+    M.Autocomplete.init(AUTHOR_ELEM, {});
+    const author_auto = M.Autocomplete.getInstance(AUTHOR_ELEM);
+    AUTHOR_ELEM.addEventListener(
+        "keypress",
+        debounce(autocompleteFunc(AUTHOR_ELEM, author_auto, "post_author"), AUTOCOMPLETE_DEBOUNCE)
+    );
 };
 
 
 // Util functions
+
+// From underscore.js
+function debounce(func, wait) {
+    let timeout;
+    return function () {
+        let context = this, args = arguments;
+        let later = function () {
+            timeout = null;
+            func.apply(context, args);
+        };
+        let callNow = !timeout;
+        clearTimeout(timeout);
+        timeout = setTimeout(later, wait);
+        if (callNow) func.apply(context, args);
+    };
+}
+
 function clone(query) {
     //TODO: Is there a more elegant way to do this?
     return JSON.parse(JSON.stringify(query));
@@ -189,10 +246,10 @@ function onFormSubmit() {
         );
     }
     if (author) {
-        query.query.bool.filter.push({"match": {"post_author": author}})
+        query.query.bool.filter.push({"term": {"post_author.keyword": author}})
     }
     if (channel) {
-        query.query.bool.filter.push({"match": {"channel_name": channel}})
+        query.query.bool.filter.push({"term": {"channel_name.keyword": channel}})
     }
 
     clearResults();
@@ -214,6 +271,42 @@ function onFormSubmit() {
 
     // Don't trigger page reload!
     return false;
+}
+
+function fetchAutoComplete(text, field, cb) {
+    queryES({
+        query: {
+            multi_match: {
+                query: text,
+                type: "bool_prefix",
+                fields: [
+                    field,
+                    field + "._2gram",
+                    field + "._3gram"
+                ]
+            }
+        },
+        aggs: {
+            top_results: {
+                terms: {
+                    field: field + ".keyword",
+                },
+                aggs: {
+                    top_results_hits: {
+                        top_hits: {
+                            sort: [
+                                {"_score": {"order": "desc"}}
+                            ],
+                            "size": 1
+                        }
+                    }
+                }
+            }
+        },
+        size: 0
+    }, function (elasticResponse) {
+        cb(elasticResponse["aggregations"]["top_results"]["buckets"].map(bucket => bucket["key"]))
+    })
 }
 
 function queryES(query, cb) {
