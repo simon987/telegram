@@ -37,7 +37,7 @@ window.onload = function () {
         document.getElementById('event-end')
     ];
 
-    slider.noUiSlider.on('update', function (values, handle) {
+    slider.noUiSlider.on('update', (values, handle) => {
         dateValues[handle].innerHTML = (new Date(+values[handle])).toISOString().slice(0, 10);
         state.dateRange[handle] = Math.round(new Date(+values[handle]).getTime() / 1000);
     });
@@ -65,15 +65,15 @@ function decorateMessage(message, query) {
             .map(token => token.replace(/^[\s()|+\-"*~]+|[\s()|+\-"*~]+$/gm, ""))
             .filter(token => token.length > 2)
             .forEach(token => {
-                message = message.replace(new RegExp(`(${token})`, "ig"), "<mark>$1</mark>"
-                )
-            });
+                    message = message.replace(new RegExp(`(${token})`, "ig"), "<mark>$1</mark>")
+                }
+            );
     }
 
     // Make links clickable, but remove the 'mark' tags in the href
     message = message.replace(
         new RegExp('(https?://[\\w_-]+.[a-z]{2,4}([^\\s"]*|$))', "ig"),
-        function (match, g1) {
+        (match, g1) => {
             return `<a href=\"${g1.replace(/<\/?mark>/g, "")}\">${g1}</a>`
         }
     );
@@ -90,41 +90,31 @@ function clearResults() {
 }
 
 function appendResults(hits) {
-    for (let i = 0; i < hits.length; i++) {
-        OUTPUT_DIV.appendChild(createTelegramMessage(hits[i]));
-    }
+    hits.map(hit => createTelegramMessage(hit))
+        .forEach(elem => OUTPUT_DIV.appendChild(elem))
 }
 
 function prependResults(hits) {
-    for (let i = hits.length - 1; i >= 0; i--) {
-        OUTPUT_DIV.prepend(createTelegramMessage(hits[i]));
-    }
+    hits.map(hit => createTelegramMessage(hit))
+        .forEach(elem => OUTPUT_DIV.prepend(elem))
 }
 
-function addLoadMoreButton(incrementQueryFunc, direction) {
+function addLoadMoreButton(mutateQueryFunc, direction) {
 
     const removePrevButton = direction === "up"
-        ? function () {
-            OUTPUT_DIV.firstChild.remove()
-        }
-        : function () {
-            OUTPUT_DIV.lastChild.remove()
-        };
+        ? () => OUTPUT_DIV.firstChild.remove()
+        : () => OUTPUT_DIV.lastChild.remove();
     const addButton = direction === "up"
-        ? function(btn) {
-            OUTPUT_DIV.prepend(btn)
-        }
-        : function(btn) {
-            OUTPUT_DIV.appendChild(btn);
-        };
+        ? btn => OUTPUT_DIV.prepend(btn)
+        : btn => OUTPUT_DIV.appendChild(btn);
 
     const onClick = function () {
         removePrevButton();
         addPreloader(direction);
-        const newQuery = incrementQueryFunc(state.lastQuery[direction]);
-        state.lastQuery[direction] = newQuery;
 
-        queryES(newQuery, function (elasticResponse) {
+        mutateQueryFunc(state.lastQuery[direction]);
+
+        queryES(state.lastQuery[direction], function (elasticResponse) {
             removePreloader();
 
             if (direction === "up") {
@@ -134,7 +124,7 @@ function addLoadMoreButton(incrementQueryFunc, direction) {
             }
 
             if (elasticResponse["hits"]["hits"].length > 0) {
-                addLoadMoreButton(incrementQueryFunc, direction);
+                addLoadMoreButton(mutateQueryFunc, direction);
             }
         });
     };
@@ -153,15 +143,15 @@ function addPreloader(direction) {
 }
 
 function removePreloader() {
-    const preloaders = OUTPUT_DIV.getElementsByClassName("progress");
-    for (let i = 0; i < preloaders.length; i++) {
-        preloaders[i].remove();
-    }
+    Array.from(OUTPUT_DIV.getElementsByClassName("progress"))
+        .forEach(elem => elem.remove());
 }
 
 function onFormSubmit() {
 
     state.inContextMessageId = null;
+    state.lastQuery.up = null;
+    state.lastQuery.down = null;
 
     const sort = document.getElementById("sort").value;
     const sortOrder = document.getElementById("sort-order").checked ? "asc" : "desc";
@@ -217,10 +207,8 @@ function onFormSubmit() {
         appendResults(elasticResponse["hits"]["hits"]);
 
         if (elasticResponse["hits"]["hits"].length < elasticResponse["hits"]["total"]["value"]) {
-            addLoadMoreButton(function (query) {
-                query.from += query.size;
-                return query
-            }, "down")
+            addLoadMoreButton(query => query.from += query.size,
+                "down")
         }
     });
 
@@ -268,8 +256,8 @@ function doInContextSearchFunc(hit) {
                 bool: {
                     must: [],
                     filter: [
-                        {range: {date: {gte: hit["_source"]["date"] - 1000000, lte: hit["_source"]["date"]}}},
-                        {"match": {"channel_name": hit["_source"]["channel_name"]}}
+                        {range: {date: {lte: hit["_source"]["date"]}}},
+                        {"term": {"channel_name.keyword": hit["_source"]["channel_name"]}}
                     ]
                 }
             },
@@ -288,17 +276,13 @@ function doInContextSearchFunc(hit) {
             state.lastQuery.down = query;
             state.lastQuery.up = clone(query);
             state.lastQuery.up.sort[0].date = "asc";
-            state.lastQuery.up.query.bool.filter[0].range.date.lte = hit["_source"]["date"] + 100000;
+            state.lastQuery.up.query.bool.filter[0].range.date.gt = hit["_source"]["date"];
+            delete state.lastQuery.up.query.bool.filter[0].range.date.lte;
+            state.lastQuery.up.from = -query.size;
+            console.log("up query: " + hit["_id"]);
 
-            addLoadMoreButton(function (query) {
-                query.from += query.size;
-                return query
-            }, "down");
-
-            addLoadMoreButton(function (query) {
-                query.from += query.size;
-                return query
-            }, "up");
+            addLoadMoreButton(q => q.from += q.size, "down");
+            addLoadMoreButton(q => q.from += q.size, "up");
         })
     }
 }
