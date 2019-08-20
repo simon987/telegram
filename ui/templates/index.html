@@ -22,11 +22,12 @@
         <h2>Pushshift Telegram Ingest</h2>
     </a>
 
-    {# Search bar #}
+    {# Search panel #}
     <div class="card-panel">
         <div class="card-content">
-            <form onsubmit="return onSubmit()">
+            <form onsubmit="return onFormSubmit()">
                 <input type="submit" style="position: absolute; left: -9999px"/>
+                {# Search bar #}
                 <div class="row">
                     <div class="input-field col s8">
                         <input id="search" type="search">
@@ -34,6 +35,7 @@
                     </div>
                     <button class="waves-effect waves-light btn-large search-button col s4">Search</button>
                 </div>
+                {# Channel & author filter #}
                 <div class="row">
                     <div class="input-field col m6">
                         <input id="channel" type="text">
@@ -45,6 +47,7 @@
                     </div>
                 </div>
 
+                {# Sort dropdown #}
                 <div class="row">
                     <div class="input-field col l3">
                         <select id="sort">
@@ -61,6 +64,8 @@
                             Asc
                         </label>
                     </div>
+
+                    {# Load media toggle #}
                     <div class="col l6" style="line-height: 5rem;">
                         <label>
                             <input type="checkbox" class="filled-in" checked="checked" id="load"/>
@@ -69,6 +74,7 @@
                     </div>
                 </div>
 
+                {# Date slider #}
                 <div class="row">
                     <div class="date-values">
                         <span class="date-val" id="event-start"></span>

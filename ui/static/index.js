@@ -1,13 +1,15 @@
-let dateRange = [-1, -1];
-let contextMessage;
-let output;
+//Constants
+const QUERY_SIZE = 20;
 
-function formatDate(date) {
-    return date.toISOString().slice(0, 10)
-}
+let state = {
+    dateRange: [0, 0],
+    inContextMessageId: "",
+};
+
+let OUTPUT_DIV;
 
 window.onload = function () {
-    output = document.getElementById("output");
+    OUTPUT_DIV = document.getElementById("output");
 
     let slider = document.getElementById("date-slider");
     noUiSlider.create(slider, {
@@ -16,7 +18,7 @@ window.onload = function () {
             max: new Date().getTime()
         },
 
-        step: 24 * 60 * 60 * 1000,
+        step: 24 * 3600 * 1000,
 
         start: [new Date("2016").getTime(), new Date().getTime()],
 
@@ -24,37 +26,27 @@ window.onload = function () {
             decimals: 0
         })
     });
+
     const dateValues = [
         document.getElementById('event-start'),
         document.getElementById('event-end')
     ];
 
     slider.noUiSlider.on('update', function (values, handle) {
-        dateValues[handle].innerHTML = formatDate(new Date(+values[handle]));
-        dateRange[handle] = Math.round(new Date(+values[handle]).getTime() / 1000);
+        dateValues[handle].innerHTML = (new Date(+values[handle])).toISOString().slice(0, 10);
+        state.dateRange[handle] = Math.round(new Date(+values[handle]).getTime() / 1000);
     });
 
-    const instances = M.FormSelect.init(document.querySelectorAll('select'), {});
+    // Materialize: init 'select' elements
+    M.FormSelect.init(document.querySelectorAll('select'), {});
 };
 
-function clearResults() {
-    while (output.hasChildNodes()) {
-        output.removeChild(output.lastChild);
-    }
-}
 
-function appendResults(hits) {
-    for (let i = 0; i < hits.length; i++) {
-        output.appendChild(createTelegramMessage(hits[i]));
-    }
+// Util functions
+function clone(query) {
+    //TODO: Is there a more elegant way to do this?
+    return JSON.parse(JSON.stringify(query));
 }
-
-function prependResults(hits) {
-    for (let i = 0; i < hits.length; i++) {
-        output.prepend(createTelegramMessage(hits[i]));
-    }
-}
-
 function decorateMessage(message, query) {
 
     if (!message) {
@@ -62,10 +54,14 @@ function decorateMessage(message, query) {
     }
 
     if (query) {
-        query.split(" ").filter(token => token.length > 2).forEach(token => {
-            message = message.replace(new RegExp(`(${token})`, "ig"), "<mark>$1</mark>"
-            )
-        });
+        query.split(/\s+/)
+            //Remove chars used in simple_query_string
+            .map(token => token.replace(/^[\s()|+\-"*~]+|[\s()|+\-"*~]+$/gm, ""))
+            .filter(token => token.length > 2)
+            .forEach(token => {
+                message = message.replace(new RegExp(`(${token})`, "ig"), "<mark>$1</mark>"
+                )
+            });
     }
 
     // Make links clickable, but remove the 'mark' tags in the href
@@ -79,66 +75,93 @@ function decorateMessage(message, query) {
     return message;
 }
 
-function addLoadMoreButton(output, query, direction) {
+// ----------
+
+function clearResults() {
+    while (OUTPUT_DIV.hasChildNodes()) {
+        OUTPUT_DIV.removeChild(OUTPUT_DIV.lastChild);
+    }
+}
+
+function appendResults(hits) {
+    for (let i = 0; i < hits.length; i++) {
+        OUTPUT_DIV.appendChild(createTelegramMessage(hits[i]));
+    }
+}
+
+function prependResults(hits) {
+    for (let i = 0; i < hits.length; i++) {
+        OUTPUT_DIV.prepend(createTelegramMessage(hits[i]));
+    }
+}
+
+function addLoadMoreButton(query, direction) {
+    //TODO: refac
     if (direction === "down") {
-        output.appendChild(createButton("Load more results", "waves-effect waves-light btn",
+        OUTPUT_DIV.appendChild(createButton("Load more results", "waves-effect waves-light btn",
             function () {
 
                 // Move button to end
-                const btn = output.lastChild;
+                const btn = OUTPUT_DIV.lastChild;
                 btn.remove();
 
                 const preloader = createPreloader();
-                output.appendChild(preloader);
+                OUTPUT_DIV.appendChild(preloader);
 
                 query.from += query.size;
+                //TODO: remove this hack
                 if (Object.keys(query.query.bool.filter[0].range)[0] === "date") {
                     query.query.bool.filter[0].range.date.lte += 900000;
                 }
                 queryES(query, function (elasticResponse) {
-                    appendResults(elasticResponse["hits"]["hits"], output);
+                    appendResults(elasticResponse["hits"]["hits"]);
                     preloader.remove();
                     if (elasticResponse["hits"]["hits"].length > 0) {
-                        output.appendChild(btn);
+                        OUTPUT_DIV.appendChild(btn);
                     }
                 });
             }));
     } else {
-        output.prepend(createButton("Load more results", "waves-effect waves-light btn",
+        OUTPUT_DIV.prepend(createButton("Load more results", "waves-effect waves-light btn",
             function () {
 
-                const btn = output.firstChild;
+                const btn = OUTPUT_DIV.firstChild;
                 btn.remove();
 
                 const preloader = createPreloader();
-                output.prepend(preloader);
+                OUTPUT_DIV.prepend(preloader);
 
                 query.from += query.size;
                 if (Object.keys(query.query.bool.filter[0].range)[0] === "date") {
                     query.query.bool.filter[0].range.date.gte -= 900000;
                 }
                 queryES(query, function (elasticResponse) {
-                    prependResults(elasticResponse["hits"]["hits"], output);
+                    prependResults(elasticResponse["hits"]["hits"]);
                     preloader.remove();
                     if (elasticResponse["hits"]["hits"].length > 0) {
-                        output.prepend(btn);
+                        OUTPUT_DIV.prepend(btn);
                     }
                 });
             }));
     }
 }
 
-function onSubmit() {
+function onFormSubmit() {
 
     const sort = document.getElementById("sort").value;
     const sortOrder = document.getElementById("sort-order").checked ? "asc" : "desc";
+    const message = document.getElementById("search").value;
+    const author = document.getElementById("author").value;
+    const channel = document.getElementById("channel").value;
+    const minDate = state.dateRange[0];
+    const maxDate = state.dateRange[1];
 
     let query = {
         query: {
             bool: {
                 must: [],
                 filter: [
-                    {range: {date: {gte: dateRange[0], lte: dateRange[1]}}}
+                    {range: {date: {gte: minDate, lte: maxDate}}}
                 ]
             }
         },
@@ -146,11 +169,10 @@ function onSubmit() {
             {[sort]: sortOrder},
             {"_id": "asc"},
         ],
-        size: 25,
+        size: QUERY_SIZE,
         from: 0
     };
 
-    const message = document.getElementById("search").value;
     if (message) {
         query.query.bool.must.push(
             {
@@ -162,30 +184,27 @@ function onSubmit() {
             }
         );
     }
-    const author = document.getElementById("author").value;
     if (author) {
         query.query.bool.filter.push({"match": {"post_author": author}})
     }
-
-    const channel = document.getElementById("channel").value;
     if (channel) {
         query.query.bool.filter.push({"match": {"channel_name": channel}})
     }
 
-    const output = document.getElementById("output");
-
     clearResults();
+
     let preloader = createPreloader();
-    output.appendChild(preloader);
+    OUTPUT_DIV.appendChild(preloader);
 
     queryES(query, function (elasticResponse) {
         preloader.remove();
 
-        output.appendChild(createHeader(`${elasticResponse["hits"]["total"]["value"]} messages`));
-        appendResults(elasticResponse["hits"]["hits"], output);
+        //TODO: move header outside of #output
+        OUTPUT_DIV.appendChild(createHeader(`${elasticResponse["hits"]["total"]["value"]} messages`));
+        appendResults(elasticResponse["hits"]["hits"]);
 
         if (elasticResponse["hits"]["hits"].length < elasticResponse["hits"]["total"]["value"]) {
-            addLoadMoreButton(output, query, "down")
+            addLoadMoreButton(query, "down")
         }
     });
 
@@ -195,8 +214,7 @@ function onSubmit() {
 
 function queryES(query, cb) {
 
-    const base_url = "https://dev.pushshift.io/telegram/_search";
-    const url = base_url + `?source_content_type=application/json&source=${JSON.stringify(query)}`;
+    const url = `https://dev.pushshift.io/telegram/_search?source_content_type=application/json&source=${JSON.stringify(query)}`;
 
     const xmlHttp = new XMLHttpRequest();
     xmlHttp.open("GET", url, true);
@@ -207,6 +225,7 @@ function queryES(query, cb) {
                 console.log(response);
                 cb(response)
             } else {
+                // TODO: Display error in toast or something
                 console.log("HTTP request error:");
                 console.log(xmlHttp);
             }
@@ -225,9 +244,11 @@ function createTelegramMessage(hit) {
 
     const message = document.createElement("div");
     message.setAttribute("class", "message clearfix card");
-    if (contextMessage === hit["_id"]) {
+
+    // If the message is the 'inContextMessage', apply custom CSS and scroll into it
+    if (state.inContextMessageId === hit["_id"]) {
         message.classList.add("context-message");
-        window.setTimeout(function() {
+        window.setTimeout(function () {
             message.scrollIntoView()
         }, 1000);
     }
@@ -237,25 +258,26 @@ function createTelegramMessage(hit) {
 
     message.appendChild(createButton("context", "btn btn-xsmall pull_right action-btn",
         function () {
-            contextMessage = hit["_id"];
-            clearResults(output);
+            state.inContextMessageId = hit["_id"];
+            clearResults(OUTPUT_DIV);
             let preloader = createPreloader();
-            output.appendChild(preloader);
+            OUTPUT_DIV.appendChild(preloader);
 
             const query = {
                 query: {
                     bool: {
                         must: [],
                         filter: [
+                            //TODO: Remove this date hack and use search_after
                             {range: {date: {gte: hit["_source"]["date"] - 60, lte: hit["_source"]["date"] + 60}}},
                             {"match": {"channel_name": hit["_source"]["channel_name"]}}
                         ]
                     }
                 },
                 "sort": [
-                    {"date": "asc"}
+                    {"date": "desc"}
                 ],
-                size: 20,
+                size: QUERY_SIZE,
                 from: 0
             };
 
@@ -264,11 +286,11 @@ function createTelegramMessage(hit) {
                 appendResults(elasticResponse["hits"]["hits"]);
                 preloader.remove();
 
-                let upQuery = JSON.parse(JSON.stringify(query));
+                let upQuery = clone(query);
                 upQuery.sort[0].date = "desc";
 
-                addLoadMoreButton(document.getElementById("output"), query, "down");
-                addLoadMoreButton(document.getElementById("output"), upQuery, "up");
+                addLoadMoreButton(query, "down");
+                addLoadMoreButton(upQuery, "up");
             })
         }));
 
@@ -292,7 +314,7 @@ function createTelegramMessageBody(hit) {
     fromName.onclick = function () {
         document.getElementById("channel").value = hit["_source"]["channel_name"];
         document.getElementById("channel-label").classList.add("active");
-        onSubmit();
+        onFormSubmit();
     };
 
     if (hit["_source"]["post_author"]) {
@@ -308,7 +330,7 @@ function createTelegramMessageBody(hit) {
             e.stopPropagation();
             document.getElementById("author").value = hit["_source"]["post_author"];
             document.getElementById("author-label").classList.add("active");
-            onSubmit();
+            onFormSubmit();
             return false;
         };
         fromName.appendChild(authorName);
@@ -337,11 +359,9 @@ function createTelegramUserPic(hit) {
 
     const userPic = document.createElement("dic");
     userPic.setAttribute("class", "userpic");
-    userPic.setAttribute("style", "width: 42px; height: 42px");
 
     const initials = document.createElement("div");
     initials.setAttribute("class", "initials");
-    initials.setAttribute("style", "line-height: 42px");
 
     if (hit["_source"]["post_author"]) {
         initials.setAttribute("title", hit["_source"]["post_author"]);
