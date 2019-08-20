@@ -4,6 +4,11 @@ const QUERY_SIZE = 20;
 let state = {
     dateRange: [0, 0],
     inContextMessageId: "",
+    lastQuery: {
+        "up": null,
+        "down": null,
+    },
+    lastResponse: null,
 };
 
 let OUTPUT_DIV;
@@ -47,6 +52,7 @@ function clone(query) {
     //TODO: Is there a more elegant way to do this?
     return JSON.parse(JSON.stringify(query));
 }
+
 function decorateMessage(message, query) {
 
     if (!message) {
@@ -55,7 +61,7 @@ function decorateMessage(message, query) {
 
     if (query) {
         query.split(/\s+/)
-            //Remove chars used in simple_query_string
+        //Remove chars used in simple_query_string
             .map(token => token.replace(/^[\s()|+\-"*~]+|[\s()|+\-"*~]+$/gm, ""))
             .filter(token => token.length > 2)
             .forEach(token => {
@@ -90,63 +96,72 @@ function appendResults(hits) {
 }
 
 function prependResults(hits) {
-    for (let i = 0; i < hits.length; i++) {
+    for (let i = hits.length - 1; i >= 0; i--) {
         OUTPUT_DIV.prepend(createTelegramMessage(hits[i]));
     }
 }
 
-function addLoadMoreButton(query, direction) {
-    //TODO: refac
-    if (direction === "down") {
-        OUTPUT_DIV.appendChild(createButton("Load more results", "waves-effect waves-light btn",
-            function () {
+function addLoadMoreButton(incrementQueryFunc, direction) {
 
-                // Move button to end
-                const btn = OUTPUT_DIV.lastChild;
-                btn.remove();
+    const removePrevButton = direction === "up"
+        ? function () {
+            OUTPUT_DIV.firstChild.remove()
+        }
+        : function () {
+            OUTPUT_DIV.lastChild.remove()
+        };
+    const addButton = direction === "up"
+        ? function(btn) {
+            OUTPUT_DIV.prepend(btn)
+        }
+        : function(btn) {
+            OUTPUT_DIV.appendChild(btn);
+        };
 
-                const preloader = createPreloader();
-                OUTPUT_DIV.appendChild(preloader);
+    const onClick = function () {
+        removePrevButton();
+        addPreloader(direction);
+        const newQuery = incrementQueryFunc(state.lastQuery[direction]);
+        state.lastQuery[direction] = newQuery;
 
-                query.from += query.size;
-                //TODO: remove this hack
-                if (Object.keys(query.query.bool.filter[0].range)[0] === "date") {
-                    query.query.bool.filter[0].range.date.lte += 900000;
-                }
-                queryES(query, function (elasticResponse) {
-                    appendResults(elasticResponse["hits"]["hits"]);
-                    preloader.remove();
-                    if (elasticResponse["hits"]["hits"].length > 0) {
-                        OUTPUT_DIV.appendChild(btn);
-                    }
-                });
-            }));
+        queryES(newQuery, function (elasticResponse) {
+            removePreloader();
+
+            if (direction === "up") {
+                prependResults(elasticResponse["hits"]["hits"]);
+            } else {
+                appendResults(elasticResponse["hits"]["hits"]);
+            }
+
+            if (elasticResponse["hits"]["hits"].length > 0) {
+                addLoadMoreButton(incrementQueryFunc, direction);
+            }
+        });
+    };
+
+    addButton(createButton("Load more results", "waves-effect waves-light btn", onClick));
+}
+
+function addPreloader(direction) {
+    const preloader = createPreloader();
+
+    if (direction === "up") {
+        OUTPUT_DIV.prepend(preloader);
     } else {
-        OUTPUT_DIV.prepend(createButton("Load more results", "waves-effect waves-light btn",
-            function () {
+        OUTPUT_DIV.appendChild(preloader);
+    }
+}
 
-                const btn = OUTPUT_DIV.firstChild;
-                btn.remove();
-
-                const preloader = createPreloader();
-                OUTPUT_DIV.prepend(preloader);
-
-                query.from += query.size;
-                if (Object.keys(query.query.bool.filter[0].range)[0] === "date") {
-                    query.query.bool.filter[0].range.date.gte -= 900000;
-                }
-                queryES(query, function (elasticResponse) {
-                    prependResults(elasticResponse["hits"]["hits"]);
-                    preloader.remove();
-                    if (elasticResponse["hits"]["hits"].length > 0) {
-                        OUTPUT_DIV.prepend(btn);
-                    }
-                });
-            }));
+function removePreloader() {
+    const preloaders = OUTPUT_DIV.getElementsByClassName("progress");
+    for (let i = 0; i < preloaders.length; i++) {
+        preloaders[i].remove();
     }
 }
 
 function onFormSubmit() {
+
+    state.inContextMessageId = null;
 
     const sort = document.getElementById("sort").value;
     const sortOrder = document.getElementById("sort-order").checked ? "asc" : "desc";
@@ -167,7 +182,6 @@ function onFormSubmit() {
         },
         "sort": [
             {[sort]: sortOrder},
-            {"_id": "asc"},
         ],
         size: QUERY_SIZE,
         from: 0
@@ -192,19 +206,21 @@ function onFormSubmit() {
     }
 
     clearResults();
+    addPreloader();
 
-    let preloader = createPreloader();
-    OUTPUT_DIV.appendChild(preloader);
-
+    state.lastQuery.down = query;
     queryES(query, function (elasticResponse) {
-        preloader.remove();
+        removePreloader();
 
         //TODO: move header outside of #output
-        OUTPUT_DIV.appendChild(createHeader(`${elasticResponse["hits"]["total"]["value"]} messages`));
+        //OUTPUT_DIV.appendChild(createHeader(`${elasticResponse["hits"]["total"]["value"]} messages`));
         appendResults(elasticResponse["hits"]["hits"]);
 
         if (elasticResponse["hits"]["hits"].length < elasticResponse["hits"]["total"]["value"]) {
-            addLoadMoreButton(query, "down")
+            addLoadMoreButton(function (query) {
+                query.from += query.size;
+                return query
+            }, "down")
         }
     });
 
@@ -223,6 +239,7 @@ function queryES(query, cb) {
             if (xmlHttp.status === 200) {
                 const response = JSON.parse(xmlHttp.responseText);
                 console.log(response);
+                state.lastResponse = response;
                 cb(response)
             } else {
                 // TODO: Display error in toast or something
@@ -240,59 +257,68 @@ function createHeader(text) {
     return el;
 }
 
+function doInContextSearchFunc(hit) {
+    return function () {
+        state.inContextMessageId = hit["_id"];
+        clearResults(OUTPUT_DIV);
+        addPreloader();
+
+        const query = {
+            query: {
+                bool: {
+                    must: [],
+                    filter: [
+                        {range: {date: {gte: hit["_source"]["date"] - 1000000, lte: hit["_source"]["date"]}}},
+                        {"match": {"channel_name": hit["_source"]["channel_name"]}}
+                    ]
+                }
+            },
+            "sort": [
+                {"date": "desc"}
+            ],
+            size: QUERY_SIZE / 2,
+            from: 0
+        };
+
+        queryES(query, function (elasticResponse) {
+
+            appendResults(elasticResponse["hits"]["hits"]);
+            removePreloader();
+
+            state.lastQuery.down = query;
+            state.lastQuery.up = clone(query);
+            state.lastQuery.up.sort[0].date = "asc";
+            state.lastQuery.up.query.bool.filter[0].range.date.lte = hit["_source"]["date"] + 100000;
+
+            addLoadMoreButton(function (query) {
+                query.from += query.size;
+                return query
+            }, "down");
+
+            addLoadMoreButton(function (query) {
+                query.from += query.size;
+                return query
+            }, "up");
+        })
+    }
+}
+
 function createTelegramMessage(hit) {
 
     const message = document.createElement("div");
     message.setAttribute("class", "message clearfix card");
 
-    // If the message is the 'inContextMessage', apply custom CSS and scroll into it
     if (state.inContextMessageId === hit["_id"]) {
         message.classList.add("context-message");
-        window.setTimeout(function () {
-            message.scrollIntoView()
-        }, 1000);
     }
 
     message.appendChild(createTelegramUserPic(hit));
     message.appendChild(createTelegramMessageBody(hit));
 
-    message.appendChild(createButton("context", "btn btn-xsmall pull_right action-btn",
-        function () {
-            state.inContextMessageId = hit["_id"];
-            clearResults(OUTPUT_DIV);
-            let preloader = createPreloader();
-            OUTPUT_DIV.appendChild(preloader);
-
-            const query = {
-                query: {
-                    bool: {
-                        must: [],
-                        filter: [
-                            //TODO: Remove this date hack and use search_after
-                            {range: {date: {gte: hit["_source"]["date"] - 60, lte: hit["_source"]["date"] + 60}}},
-                            {"match": {"channel_name": hit["_source"]["channel_name"]}}
-                        ]
-                    }
-                },
-                "sort": [
-                    {"date": "desc"}
-                ],
-                size: QUERY_SIZE,
-                from: 0
-            };
-
-            queryES(query, function (elasticResponse) {
-
-                appendResults(elasticResponse["hits"]["hits"]);
-                preloader.remove();
-
-                let upQuery = clone(query);
-                upQuery.sort[0].date = "desc";
-
-                addLoadMoreButton(query, "down");
-                addLoadMoreButton(upQuery, "up");
-            })
-        }));
+    message.appendChild(createButton("context",
+        "btn btn-xsmall pull_right action-btn",
+        doInContextSearchFunc(hit)
+    ));
 
     return message;
 }
